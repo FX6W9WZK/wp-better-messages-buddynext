@@ -1,0 +1,27 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Better Messages for BuddyNext 0.1.0\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: de_CH\n"
+
+msgctxt "Error when starting a conversation without a relation"
+msgid "You can write to %s once you follow each other or are connected."
+msgstr "Du kannst %s schreiben, sobald ihr euch folgt oder verbunden seid."
+
+msgctxt "Message when a reply is blocked without a relation"
+msgid "You can send messages once you follow each other or are connected."
+msgstr "Du kannst Nachrichten senden, sobald ihr euch folgt oder verbunden seid."
+
+msgctxt "Error when starting a conversation with a blocked member"
+msgid "You cannot send messages to %s."
+msgstr "Du kannst %s keine Nachrichten senden."
+
+msgctxt "Message when a reply is blocked because of a block"
+msgid "You cannot send messages in this conversation."
+msgstr "Du kannst in dieser Unterhaltung keine Nachrichten senden."
+
+msgctxt "Error when a guest tries to start a conversation"
+msgid "Please sign in to send messages."
+msgstr "Bitte melde dich an, um Nachrichten zu senden."
