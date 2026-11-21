@@ -79,6 +79,7 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Groups' ) ) {
                 add_action( 'init', array( $this, 'maybe_backfill' ), 50 );
                 add_action( 'init', array( $this, 'schedule_daily_sync' ), 50 );
                 add_action( 'bm_buddynext_daily_sync', array( $this, 'daily_sync' ) );
+                add_action( 'admin_post_bm_buddynext_sync', array( $this, 'handle_manual_sync' ) );
 
                 if ( bm_buddynext_setting( 'buddynextEnableGroupsFiles', '1' ) === '0' ) {
                     add_action( 'bp_better_messages_user_can_upload_files', array( $this, 'disable_upload_files' ), 10, 3 );
@@ -561,9 +562,33 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Groups' ) ) {
             }
         }
 
+        /**
+         * Manual trigger for administrators:
+         * wp-admin/admin-post.php?action=bm_buddynext_sync&_wpnonce=<nonce for bm_buddynext_sync>
+         * Runs the same pass as the daily cron and reports what it did -
+         * for verifying the integration after an incident without waiting
+         * a day for the cron.
+         */
+        public function handle_manual_sync()
+        {
+            if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'bm_buddynext_sync' ) ) {
+                wp_die( 'Not allowed.' );
+            }
+
+            $report = $this->daily_sync();
+
+            wp_die( wp_json_encode( $report ), 'BuddyNext sync', array( 'response' => 200 ) );
+        }
+
         public function daily_sync()
         {
             global $wpdb;
+
+            $report = array(
+                'threads_checked' => 0,
+                'orphans_erased'  => array(),
+                'spaces_synced'   => 0,
+            );
 
             /**
              * Threads whose space is gone (or archived) are erased. Covers
@@ -578,8 +603,11 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Groups' ) ) {
             " );
 
             foreach ( $rows as $row ) {
+                $report['threads_checked']++;
+
                 if ( null === $this->get_space( (int) $row->meta_value ) ) {
                     Better_Messages()->functions->erase_thread( (int) $row->bm_thread_id );
+                    $report['orphans_erased'][] = (int) $row->bm_thread_id;
                 }
             }
 
@@ -594,7 +622,10 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Groups' ) ) {
 
             foreach ( $space_ids as $space_id ) {
                 $this->on_membership_changed( (int) $space_id );
+                $report['spaces_synced']++;
             }
+
+            return $report;
         }
 
         /** ------------------------------------------------------------

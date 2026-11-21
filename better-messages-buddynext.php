@@ -3,7 +3,7 @@
  * Plugin Name:       Better Messages for BuddyNext
  * Plugin URI:        https://github.com/FX6W9WZK/wp-better-messages-buddynext
  * Description:       Connects Better Messages with the BuddyNext community plugin: automatic group chats for BuddyNext spaces, follower/connection based messaging rules, block list support and BuddyNext profile links inside the messenger.
- * Version:           0.1.1
+ * Version:           0.1.2
  * Requires PHP:      8.2
  * Requires Plugins:  bp-better-messages, buddynext
  * Author:            Thomas Guldener
@@ -23,7 +23,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BM_BUDDYNEXT_VERSION', '0.1.1' );
+define( 'BM_BUDDYNEXT_VERSION', '0.1.2' );
 define( 'BM_BUDDYNEXT_PATH', plugin_dir_path( __FILE__ ) );
 
 /**
