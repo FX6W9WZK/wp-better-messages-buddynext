@@ -2,17 +2,18 @@
 /**
  * BuddyNext navigation for Better Messages.
  *
- * The main entry is a tab registered on `buddynext_nav_tabs`: that is the
- * catalogue the backend nav editor (Settings > Navigation) renders, so the
- * owner can rename, reorder, hide or gate it there like any entry - and
- * BuddyNext's NavOverrides bridges every URL-carrying tab from that filter
- * onto the left rail by itself. (BuddyNext's own Messages entry cannot be
- * used: the editor couples it to the WPMediaVerse engine switch.)
+ * The rail entry is an item of its own (key `bm-messages`) appended on
+ * `buddynext_rail_items` at priority 11 - before the owner's overrides
+ * (priority 20) and before the backend nav editor's catalogue capture
+ * (priority 19), which is how the editor lists third-party rail items as
+ * manageable rows. BuddyNext's own Messages entry cannot be reused: core
+ * couples it to the WPMediaVerse engine switch, in the editor too.
  *
- * On top of that: the unread badge on the bridged rail item (the bridge
- * carries no badge), a row in the account dropdown catalogue (which also
- * feeds the menu metabox and the nav editor's account section) and a row
- * in the mobile bar's sheet.
+ * Icon overrides saved in the editor are applied by reading the override
+ * options directly (core never lays the icon back onto rail items), the
+ * same way the wp-buddynext-bg hubs do it. The account dropdown row rides
+ * the `buddynext_user_links` catalogue, the mobile row the mobile filter,
+ * where the editor's row position decides bar slot versus More sheet.
  *
  * The profile "Message" button has no core seam yet (profile-actions.php
  * hardcodes PageRouter::messages_url()); a filterable URL has been
@@ -46,8 +47,7 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
                 return;
             }
 
-            add_filter( 'buddynext_nav_tabs', array( $this, 'nav_tab' ) );
-            add_filter( 'buddynext_rail_items', array( $this, 'rail_badge' ), 30, 2 );
+            add_filter( 'buddynext_rail_items', array( $this, 'rail_item' ), 11, 2 );
             add_filter( 'buddynext_user_links', array( $this, 'user_links' ), 10, 2 );
             add_filter( 'buddynext_mobile_nav_items', array( $this, 'mobile_items' ), 10, 2 );
         }
@@ -84,59 +84,86 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
         }
 
         /**
-         * Register the tab in the backend nav editor's catalogue. A tab
-         * from this filter that carries a `url` is bridged onto the left
-         * rail by NavOverrides::apply_rail, deduped and capability-gated,
-         * so this one registration covers backend management AND the rail.
+         * The icon the nav editor saved for a key, else the default - core
+         * applies label/order/hidden overrides onto rail and mobile items
+         * but never the icon, so integrations read it back themselves.
          *
-         * @param array $tabs Catalogue entries.
-         * @return array
+         * @param string $key          Item key.
+         * @param string $default_icon Fallback icon.
+         * @param string $option       Overrides option name.
+         * @return string
          */
-        public function nav_tab( $tabs )
+        public static function nav_icon( string $key, string $default_icon, string $option = 'buddynext_nav_overrides' ): string
         {
-            $tabs   = (array) $tabs;
+            $stored = get_option( $option, array() );
 
-            foreach ( $tabs as $tab ) {
-                if ( ( $tab['slug'] ?? '' ) === self::NAV_KEY ) {
-                    return $tabs; // Idempotent: the filter runs in admin and on the rail bridge.
-                }
+            if ( ! is_array( $stored ) || ! isset( $stored[ $key ] ) || ! is_array( $stored[ $key ] ) ) {
+                return $default_icon;
             }
 
-            $tabs[] = array(
-                'slug'        => self::NAV_KEY,
-                'label'       => _x( 'Messages', 'Navigation entry', 'better-messages-buddynext' ),
-                'icon'        => 'message-circle',
-                'order'       => 55,
-                'url'         => $this->inbox_url(),
-                'capability'  => 'read',
-                'custom'      => true,
-                'description' => _x( 'The Better Messages inbox', 'Navigation entry description', 'better-messages-buddynext' ),
-                'integration' => 'Better Messages',
-            );
+            $icon = sanitize_key( (string) ( $stored[ $key ]['icon'] ?? '' ) );
 
-            return $tabs;
+            return '' !== $icon && 'tab-custom' !== $icon ? $icon : $default_icon;
         }
 
         /**
-         * The rail bridge carries no badge - lay the unread count onto the
-         * bridged item after NavOverrides ran (it filters at 20).
+         * Whether the mobile entry belongs in the "More" sheet (true) or
+         * in the bottom bar (false): the row's position in the editor's
+         * mobile list decides - dragged above the locked Profile anchor
+         * (order 50) it takes a bar slot.
+         *
+         * @param string $key Item key.
+         * @return bool
+         */
+        public static function mobile_overflow( string $key ): bool
+        {
+            $stored = get_option( 'buddynext_nav_overrides_mobile', array() );
+
+            if ( ! is_array( $stored ) || ! isset( $stored[ $key ] ) || ! is_array( $stored[ $key ] ) || ! isset( $stored[ $key ]['order'] ) ) {
+                return true;
+            }
+
+            return (int) $stored[ $key ]['order'] >= 50;
+        }
+
+        /**
+         * Our rail entry, placed right after Notifications. Priority 11
+         * keeps it visible to the nav editor's catalogue capture (19) and
+         * under the owner's overrides (20).
          *
          * @param array  $items Rail items.
          * @param string $hub   Current hub slug.
          * @return array
          */
-        public function rail_badge( $items, $hub )
+        public function rail_item( $items, $hub )
         {
-            $unread = 0;
+            $items = (array) $items;
 
-            foreach ( (array) $items as $i => $item ) {
+            foreach ( $items as $item ) {
                 if ( ( $item['key'] ?? '' ) === self::NAV_KEY ) {
-                    if ( 0 === $unread ) {
-                        $unread = $this->unread_count();
-                    }
-                    $items[ $i ]['badge'] = $unread;
+                    return $items;
                 }
             }
+
+            $entry = array(
+                'key'   => self::NAV_KEY,
+                'url'   => $this->inbox_url(),
+                'label' => _x( 'Messages', 'Navigation entry', 'better-messages-buddynext' ),
+                'icon'  => self::nav_icon( self::NAV_KEY, 'message-circle' ),
+                'badge' => $this->unread_count(),
+                'show'  => is_user_logged_in(),
+            );
+
+            $position = count( $items );
+
+            foreach ( $items as $index => $item ) {
+                if ( 'notifications' === ( $item['key'] ?? '' ) ) {
+                    $position = $index + 1;
+                    break;
+                }
+            }
+
+            array_splice( $items, $position, 0, array( $entry ) );
 
             return $items;
         }
@@ -189,10 +216,9 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
         }
 
         /**
-         * Mobile bottom bar: a Messages row with the unread badge. Order
-         * 70 lands it in the More sheet (orders below 50 take a bar
-         * slot); the site owner can move it in the nav editor. Same key
-         * as the main tab, so the editor's mobile overrides land on it.
+         * Mobile bar entry: registering our key here lets the editor's
+         * mobile overrides land on it, and its row position decides bar
+         * slot versus More sheet (mobile_overflow).
          *
          * @param array  $items  Bar item definitions.
          * @param string $active Active mobile-bar key.
@@ -200,6 +226,8 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
          */
         public function mobile_items( $items, $active = '' )
         {
+            $items = (array) $items;
+
             foreach ( $items as $item ) {
                 if ( ( $item['key'] ?? '' ) === self::NAV_KEY ) {
                     return $items;
@@ -211,12 +239,12 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
             $items[] = array(
                 'key'         => self::NAV_KEY,
                 'url'         => $this->inbox_url(),
-                'icon'        => 'message-circle',
+                'icon'        => self::nav_icon( self::NAV_KEY, self::nav_icon( self::NAV_KEY, 'message-circle' ), 'buddynext_nav_overrides_mobile' ),
                 'label'       => _x( 'Messages', 'Navigation entry', 'better-messages-buddynext' ),
                 'show'        => is_user_logged_in(),
                 'badge'       => $unread > 0,
                 'badge_count' => $unread,
-                'order'       => 70,
+                'overflow'    => self::mobile_overflow( self::NAV_KEY ),
             );
 
             return $items;
