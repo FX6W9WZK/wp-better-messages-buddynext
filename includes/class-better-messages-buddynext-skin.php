@@ -236,12 +236,13 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Skin' ) ) {
          * @param array<string,string> $tokens   token => value.
          * @return string
          */
-        private function rule( string $selector, array $tokens ): string
+        private function rule( string $selector, array $tokens, bool $important = false ): string
         {
-            $decls = '';
+            $decls  = '';
+            $suffix = $important ? ' !important;' : ';';
 
             foreach ( $tokens as $token => $value ) {
-                $decls .= $token . ':' . $value . ';';
+                $decls .= $token . ':' . $value . $suffix;
             }
 
             return $selector . '{' . $decls . '}';
@@ -262,6 +263,35 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Skin' ) ) {
             // carries pages that render without the BuddyX shell.
             $rules[] = $this->rule( 'body, html[data-bx-mode="light"] body', $this->palette( 'light' ) + $this->zone_palette( 'light' ) );
             $rules[] = $this->rule( 'html[data-bx-mode="dark"] body', $this->palette( 'dark' ) + $this->zone_palette( 'dark' ) );
+
+            /**
+             * The zone tokens again, declared on every element inside the
+             * messenger surfaces, important. The interface sets its zone
+             * values late and locally (an element-level declaration was
+             * the only thing observed to win against it), so inheriting
+             * them from body is not enough: this puts the house values on
+             * each element, where an author !important declaration beats
+             * the plugin's own setters. It deliberately flattens
+             * per-surface Appearance colors into the one house palette.
+             */
+            $bm_scope = static function ( string $mode_prefix ): string {
+                $roots = array(
+                    '.bm-wrap-main',
+                    '.bm-embedded-inbox',
+                    '#better-messages-modals-container',
+                    '.bm-mini-widgets',
+                    '.bm-mini-chats',
+                );
+                $parts = array();
+                foreach ( $roots as $root ) {
+                    $parts[] = $mode_prefix . $root;
+                    $parts[] = $mode_prefix . $root . ' *';
+                }
+                return implode( ',', $parts );
+            };
+
+            $rules[] = $this->rule( $bm_scope( '' ), $this->zone_palette( 'light' ), true );
+            $rules[] = $this->rule( $bm_scope( 'html[data-bx-mode="dark"] ' ), $this->zone_palette( 'dark' ), true );
 
             // House typography and corner radii, consumed as plain values,
             // so the live bn tokens work directly.
