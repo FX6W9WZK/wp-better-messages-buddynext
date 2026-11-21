@@ -51,6 +51,36 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
             add_filter( 'buddynext_user_links', array( $this, 'user_links' ), 10, 2 );
             add_filter( 'buddynext_mobile_nav_items', array( $this, 'mobile_items' ), 10, 2 );
             add_action( 'admin_init', array( $this, 'seed_mobile_editor_row' ) );
+            add_action( 'template_redirect', array( $this, 'redirect_legacy_hub' ) );
+        }
+
+        /**
+         * BuddyNext's own /messages/ hub only shows a "messaging is
+         * disabled" card while the WPMediaVerse engine is off - but old
+         * bookmarks, stored notifications and third-party links still
+         * point there. Send them on to the Better Messages inbox. Only
+         * while the core messenger really is off: a site running both
+         * keeps its hub.
+         *
+         * @return void
+         */
+        public function redirect_legacy_hub()
+        {
+            if ( get_query_var( 'bn_hub' ) !== 'messages' ) {
+                return;
+            }
+
+            if ( class_exists( '\BuddyNext\Messages\MessagesData' )
+                && \BuddyNext\Messages\MessagesData::entry_enabled() ) {
+                return;
+            }
+
+            $url = $this->inbox_url();
+
+            if ( '' !== $url ) {
+                wp_safe_redirect( $url, 301 );
+                exit;
+            }
         }
 
         /**
