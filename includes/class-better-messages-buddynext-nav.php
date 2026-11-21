@@ -50,6 +50,42 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
             add_filter( 'buddynext_rail_items', array( $this, 'rail_item' ), 11, 2 );
             add_filter( 'buddynext_user_links', array( $this, 'user_links' ), 10, 2 );
             add_filter( 'buddynext_mobile_nav_items', array( $this, 'mobile_items' ), 10, 2 );
+            add_action( 'admin_init', array( $this, 'seed_mobile_editor_row' ) );
+        }
+
+        /**
+         * The nav editor's MOBILE catalogue is the static five-slot list
+         * plus stored override rows - it captures nothing from the mobile
+         * filter, so without a stored row our entry is invisible there
+         * and unmanageable. Seed one `custom` row once (empty URL: our
+         * registered item occupies the key, and with this plugin
+         * deactivated an empty URL renders nothing instead of a dead
+         * link). A row that already exists is the owner's and is never
+         * touched. Order 70: in the More sheet, after the hub seeds
+         * (60/65); dragging it above Profile (50) gives it a bar slot.
+         *
+         * @return void
+         */
+        public function seed_mobile_editor_row()
+        {
+            $option    = 'buddynext_nav_overrides_mobile';
+            $overrides = (array) get_option( $option, array() );
+
+            if ( isset( $overrides[ self::NAV_KEY ] ) ) {
+                return;
+            }
+
+            $overrides[ self::NAV_KEY ] = array(
+                'custom'      => true,
+                'label'       => _x( 'Messages', 'Navigation entry', 'better-messages-buddynext' ),
+                'description' => _x( 'The Better Messages inbox', 'Navigation entry description', 'better-messages-buddynext' ),
+                'order'       => 70,
+                'icon'        => '',
+                'capability'  => 'read',
+                'url'         => '',
+            );
+
+            update_option( $option, $overrides );
         }
 
         /**
