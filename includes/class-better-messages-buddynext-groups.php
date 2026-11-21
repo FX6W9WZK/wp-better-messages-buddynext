@@ -80,6 +80,7 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Groups' ) ) {
                 add_action( 'init', array( $this, 'schedule_daily_sync' ), 50 );
                 add_action( 'bm_buddynext_daily_sync', array( $this, 'daily_sync' ) );
                 add_action( 'admin_post_bm_buddynext_sync', array( $this, 'handle_manual_sync' ) );
+                add_filter( 'plugin_action_links_better-messages-buddynext/better-messages-buddynext.php', array( $this, 'action_links' ) );
 
                 if ( bm_buddynext_setting( 'buddynextEnableGroupsFiles', '1' ) === '0' ) {
                     add_action( 'bp_better_messages_user_can_upload_files', array( $this, 'disable_upload_files' ), 10, 3 );
@@ -563,11 +564,26 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Groups' ) ) {
         }
 
         /**
-         * Manual trigger for administrators:
-         * wp-admin/admin-post.php?action=bm_buddynext_sync&_wpnonce=<nonce for bm_buddynext_sync>
-         * Runs the same pass as the daily cron and reports what it did -
-         * for verifying the integration after an incident without waiting
-         * a day for the cron.
+         * "Sync now" link in the plugin row, so an administrator can run
+         * the self-heal pass without waiting a day for the cron.
+         *
+         * @param array $links Plugin action links.
+         * @return array
+         */
+        public function action_links( $links )
+        {
+            $links[] = '<a href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=bm_buddynext_sync' ), 'bm_buddynext_sync' ) ) . '">'
+                . esc_html_x( 'Sync now', 'Plugin row action', 'better-messages-buddynext' )
+                . '</a>';
+
+            return $links;
+        }
+
+        /**
+         * Manual trigger for administrators (the plugin-row "Sync now"
+         * link). Runs the same pass as the daily cron and reports what it
+         * did - for verifying the integration after an incident without
+         * waiting a day for the cron.
          */
         public function handle_manual_sync()
         {
