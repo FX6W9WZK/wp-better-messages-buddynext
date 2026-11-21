@@ -29,3 +29,7 @@ msgstr "Bitte melde dich an, um Nachrichten zu senden."
 msgctxt "Navigation entry"
 msgid "Messages"
 msgstr "Nachrichten"
+
+msgctxt "Navigation entry description"
+msgid "The Better Messages inbox"
+msgstr "Der Better-Messages-Posteingang"

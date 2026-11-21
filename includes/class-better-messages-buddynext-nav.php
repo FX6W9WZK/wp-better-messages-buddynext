@@ -1,19 +1,22 @@
 <?php
 /**
- * BuddyNext navigation for Better Messages: the Messages entry in the
- * left rail, the account dropdown (which also feeds BuddyNext's menu
- * metabox and nav editor) and the mobile bar's More sheet all point at
- * the Better Messages inbox, with the Better Messages unread count as
- * the badge.
+ * BuddyNext navigation for Better Messages.
  *
- * BuddyNext's own entries hide themselves when the WPMediaVerse
- * messaging engine is off (MessagesData::entry_enabled()), which is the
- * recommended state alongside this integration - these entries render
- * regardless of that switch.
+ * The main entry is a tab registered on `buddynext_nav_tabs`: that is the
+ * catalogue the backend nav editor (Settings > Navigation) renders, so the
+ * owner can rename, reorder, hide or gate it there like any entry - and
+ * BuddyNext's NavOverrides bridges every URL-carrying tab from that filter
+ * onto the left rail by itself. (BuddyNext's own Messages entry cannot be
+ * used: the editor couples it to the WPMediaVerse engine switch.)
+ *
+ * On top of that: the unread badge on the bridged rail item (the bridge
+ * carries no badge), a row in the account dropdown catalogue (which also
+ * feeds the menu metabox and the nav editor's account section) and a row
+ * in the mobile bar's sheet.
  *
  * The profile "Message" button has no core seam yet (profile-actions.php
- * hardcodes PageRouter::messages_url()); it disappears with the
- * WPMediaVerse switch and a filterable URL has been requested upstream.
+ * hardcodes PageRouter::messages_url()); a filterable URL has been
+ * drafted as an upstream request in docs/upstream-issue-buddynext-seams.md.
  *
  * @package BetterMessagesBuddyNext
  */
@@ -24,6 +27,8 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
 
     class Better_Messages_BuddyNext_Nav
     {
+        const NAV_KEY = 'bm-messages';
+
         public static function instance()
         {
             static $instance = null;
@@ -41,7 +46,8 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
                 return;
             }
 
-            add_filter( 'buddynext_rail_items', array( $this, 'rail_items' ), 10, 2 );
+            add_filter( 'buddynext_nav_tabs', array( $this, 'nav_tab' ) );
+            add_filter( 'buddynext_rail_items', array( $this, 'rail_badge' ), 30, 2 );
             add_filter( 'buddynext_user_links', array( $this, 'user_links' ), 10, 2 );
             add_filter( 'buddynext_mobile_nav_items', array( $this, 'mobile_items' ), 10, 2 );
         }
@@ -78,37 +84,58 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
         }
 
         /**
-         * Left rail: re-point BuddyNext's own Messages item at the Better
-         * Messages inbox (it ships hidden when WPMediaVerse messaging is
-         * off), or append one when a future core version stops seeding it.
+         * Register the tab in the backend nav editor's catalogue. A tab
+         * from this filter that carries a `url` is bridged onto the left
+         * rail by NavOverrides::apply_rail, deduped and capability-gated,
+         * so this one registration covers backend management AND the rail.
+         *
+         * @param array $tabs Catalogue entries.
+         * @return array
+         */
+        public function nav_tab( $tabs )
+        {
+            $tabs   = (array) $tabs;
+
+            foreach ( $tabs as $tab ) {
+                if ( ( $tab['slug'] ?? '' ) === self::NAV_KEY ) {
+                    return $tabs; // Idempotent: the filter runs in admin and on the rail bridge.
+                }
+            }
+
+            $tabs[] = array(
+                'slug'        => self::NAV_KEY,
+                'label'       => _x( 'Messages', 'Navigation entry', 'better-messages-buddynext' ),
+                'icon'        => 'message-circle',
+                'order'       => 55,
+                'url'         => $this->inbox_url(),
+                'capability'  => 'read',
+                'custom'      => true,
+                'description' => _x( 'The Better Messages inbox', 'Navigation entry description', 'better-messages-buddynext' ),
+                'integration' => 'Better Messages',
+            );
+
+            return $tabs;
+        }
+
+        /**
+         * The rail bridge carries no badge - lay the unread count onto the
+         * bridged item after NavOverrides ran (it filters at 20).
          *
          * @param array  $items Rail items.
          * @param string $hub   Current hub slug.
          * @return array
          */
-        public function rail_items( $items, $hub )
+        public function rail_badge( $items, $hub )
         {
-            $logged_in = is_user_logged_in();
-            $found     = false;
+            $unread = 0;
 
-            foreach ( $items as $i => $item ) {
-                if ( ( $item['key'] ?? '' ) === 'messages' ) {
-                    $items[ $i ]['url']   = $this->inbox_url();
-                    $items[ $i ]['badge'] = $this->unread_count();
-                    $items[ $i ]['show']  = $logged_in;
-                    $found                = true;
+            foreach ( (array) $items as $i => $item ) {
+                if ( ( $item['key'] ?? '' ) === self::NAV_KEY ) {
+                    if ( 0 === $unread ) {
+                        $unread = $this->unread_count();
+                    }
+                    $items[ $i ]['badge'] = $unread;
                 }
-            }
-
-            if ( ! $found ) {
-                $items[] = array(
-                    'key'   => 'messages',
-                    'label' => _x( 'Messages', 'Navigation entry', 'better-messages-buddynext' ),
-                    'url'   => $this->inbox_url(),
-                    'icon'  => 'message-circle',
-                    'badge' => $this->unread_count(),
-                    'show'  => $logged_in,
-                );
             }
 
             return $items;
@@ -164,7 +191,8 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
         /**
          * Mobile bottom bar: a Messages row with the unread badge. Order
          * 70 lands it in the More sheet (orders below 50 take a bar
-         * slot); the site owner can move it in the nav editor.
+         * slot); the site owner can move it in the nav editor. Same key
+         * as the main tab, so the editor's mobile overrides land on it.
          *
          * @param array  $items  Bar item definitions.
          * @param string $active Active mobile-bar key.
@@ -173,7 +201,7 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
         public function mobile_items( $items, $active = '' )
         {
             foreach ( $items as $item ) {
-                if ( ( $item['key'] ?? '' ) === 'bmbn-messages' ) {
+                if ( ( $item['key'] ?? '' ) === self::NAV_KEY ) {
                     return $items;
                 }
             }
@@ -181,7 +209,7 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
             $unread = $this->unread_count();
 
             $items[] = array(
-                'key'         => 'bmbn-messages',
+                'key'         => self::NAV_KEY,
                 'url'         => $this->inbox_url(),
                 'icon'        => 'message-circle',
                 'label'       => _x( 'Messages', 'Navigation entry', 'better-messages-buddynext' ),
