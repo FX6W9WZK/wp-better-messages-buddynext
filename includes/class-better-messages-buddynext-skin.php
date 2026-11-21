@@ -177,6 +177,59 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Skin' ) ) {
         }
 
         /**
+         * The per-surface ("zone") tokens. The stylesheet's surfaces do
+         * not read the shared names directly - `.bm-card` paints from
+         * `--bm-color-card-bg`, the inbox from `--bm-color-inbox-bg`, the
+         * conversation list from `--bm-color-list-bg`, and so on - and
+         * the plugin prints those zone values from its Appearance
+         * defaults, which is why re-pointing only the shared names left
+         * the surfaces white. One loop covers every zone prefix with the
+         * same vocabulary the reference documents.
+         *
+         * @param string $mode 'light' or 'dark'.
+         * @return array<string,string> token => RGB triplet.
+         */
+        private function zone_palette( string $mode ): array
+        {
+            $p      = $this->palette( $mode );
+            $accent = $p['--bm-color-accent'];
+
+            $zone_values = array(
+                'bg'          => $p['--bm-color-bg'],
+                'text'        => $p['--bm-color-text-primary'],
+                'muted'       => $p['--bm-color-text-tertiary'],
+                'preview'     => $p['--bm-color-preview'],
+                'icon'        => $p['--bm-color-icon'],
+                'border'      => $p['--bm-color-border'],
+                'field'       => $p['--bm-color-bg-secondary'],
+                'accent'      => $accent,
+                'accent-text' => $p['--bm-color-text-on-accent'],
+                'self-bg'     => $p['--bm-color-bubble-self-bg'],
+                'self-text'   => $p['--bm-color-bubble-self-text'],
+                'self-name'   => $p['--bm-color-bubble-self-nickname'],
+                'other-bg'    => $p['--bm-color-bubble-other-bg'],
+                'other-text'  => $p['--bm-color-bubble-other-text'],
+                'other-name'  => $p['--bm-color-bubble-other-nickname'],
+            );
+
+            $prefixes = array(
+                'card', 'inbox', 'list', 'secondary', 'header', 'reply',
+                'mc', 'mc-head', 'mc-reply', 'dock', 'wlist',
+                'mob', 'mob-head', 'mob-reply', 'mob-list', 'mob-tabs',
+            );
+
+            $tokens = array();
+
+            foreach ( $prefixes as $prefix ) {
+                foreach ( $zone_values as $name => $value ) {
+                    $tokens[ '--bm-color-' . $prefix . '-' . $name ] = $value;
+                }
+            }
+
+            return $tokens;
+        }
+
+        /**
          * Build one CSS rule from a token map.
          *
          * @param string               $selector CSS selector.
@@ -207,8 +260,8 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Skin' ) ) {
             // Light is the fallback too: the bootstrap script sets
             // data-bx-mode before render, so the bare-body rule only
             // carries pages that render without the BuddyX shell.
-            $rules[] = $this->rule( 'body, html[data-bx-mode="light"] body', $this->palette( 'light' ) );
-            $rules[] = $this->rule( 'html[data-bx-mode="dark"] body', $this->palette( 'dark' ) );
+            $rules[] = $this->rule( 'body, html[data-bx-mode="light"] body', $this->palette( 'light' ) + $this->zone_palette( 'light' ) );
+            $rules[] = $this->rule( 'html[data-bx-mode="dark"] body', $this->palette( 'dark' ) + $this->zone_palette( 'dark' ) );
 
             // House typography and corner radii, consumed as plain values,
             // so the live bn tokens work directly.
