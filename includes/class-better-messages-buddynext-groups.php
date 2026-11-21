@@ -68,9 +68,17 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Groups' ) ) {
 
                 /**
                  * Spaces that existed before this integration get their
-                 * chats through a one-time backfill.
+                 * chats through a one-time backfill, and a daily self-heal
+                 * pass keeps everything consistent even when a hook was
+                 * missed - e.g. a space-delete request killed mid-flight
+                 * by a PHP timeout leaves an orphaned thread, which the
+                 * next pass erases (seen live on 2026-11-21, when a
+                 * vulnerability scanner saturated the worker pool and a
+                 * delete died between the space queries and this hook).
                  */
                 add_action( 'init', array( $this, 'maybe_backfill' ), 50 );
+                add_action( 'init', array( $this, 'schedule_daily_sync' ), 50 );
+                add_action( 'bm_buddynext_daily_sync', array( $this, 'daily_sync' ) );
 
                 if ( bm_buddynext_setting( 'buddynextEnableGroupsFiles', '1' ) === '0' ) {
                     add_action( 'bp_better_messages_user_can_upload_files', array( $this, 'disable_upload_files' ), 10, 3 );
@@ -540,6 +548,53 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Groups' ) ) {
             }
 
             update_option( 'bm_buddynext_groups_backfilled', time(), false );
+        }
+
+        /** ------------------------------------------------------------
+         *  Daily self-heal: erase orphaned threads, re-sync members
+         *  ------------------------------------------------------------ */
+
+        public function schedule_daily_sync()
+        {
+            if ( ! wp_next_scheduled( 'bm_buddynext_daily_sync' ) ) {
+                wp_schedule_event( time() + 300, 'daily', 'bm_buddynext_daily_sync' );
+            }
+        }
+
+        public function daily_sync()
+        {
+            global $wpdb;
+
+            /**
+             * Threads whose space is gone (or archived) are erased. Covers
+             * every path where the space-deleted hook did not run to the
+             * end: a request killed by a timeout, a space removed straight
+             * in the database, an archive while this integration was off.
+             */
+            $rows = $wpdb->get_results( "
+            SELECT bm_thread_id, meta_value
+            FROM `" . bm_get_table( 'threadsmeta' ) . "`
+            WHERE `meta_key` = '" . self::THREAD_META_KEY . "'
+            " );
+
+            foreach ( $rows as $row ) {
+                if ( null === $this->get_space( (int) $row->meta_value ) ) {
+                    Better_Messages()->functions->erase_thread( (int) $row->bm_thread_id );
+                }
+            }
+
+            /**
+             * And the other direction: every live space gets its thread
+             * participants re-synced, so a missed membership hook heals
+             * within a day.
+             */
+            $space_ids = $wpdb->get_col(
+                "SELECT id FROM {$wpdb->prefix}bn_spaces WHERE is_archived = 0 ORDER BY id ASC LIMIT 500"
+            );
+
+            foreach ( $space_ids as $space_id ) {
+                $this->on_membership_changed( (int) $space_id );
+            }
         }
 
         /** ------------------------------------------------------------

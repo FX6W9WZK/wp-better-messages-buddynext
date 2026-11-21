@@ -3,7 +3,7 @@
  * Plugin Name:       Better Messages for BuddyNext
  * Plugin URI:        https://github.com/FX6W9WZK/wp-better-messages-buddynext
  * Description:       Connects Better Messages with the BuddyNext community plugin: automatic group chats for BuddyNext spaces, follower/connection based messaging rules, block list support and BuddyNext profile links inside the messenger.
- * Version:           0.1.0
+ * Version:           0.1.1
  * Requires PHP:      8.2
  * Requires Plugins:  bp-better-messages, buddynext
  * Author:            Thomas Guldener
@@ -23,8 +23,29 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BM_BUDDYNEXT_VERSION', '0.1.0' );
+define( 'BM_BUDDYNEXT_VERSION', '0.1.1' );
 define( 'BM_BUDDYNEXT_PATH', plugin_dir_path( __FILE__ ) );
+
+/**
+ * Self-hosted updates from GitHub Releases: the plugin is not listed on
+ * WordPress.org (yet), so without this every new version would be a manual
+ * zip upload. Points at the release ASSET built by the release script, not
+ * GitHub's source zipball, whose internal folder name would mismatch the
+ * installed plugin folder. Registered outside bm_buddynext_init() on
+ * purpose - updates must flow even while Better Messages or BuddyNext are
+ * deactivated.
+ */
+require_once BM_BUDDYNEXT_PATH . 'vendor/plugin-update-checker/plugin-update-checker.php';
+
+\YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+    'https://github.com/FX6W9WZK/wp-better-messages-buddynext/',
+    __FILE__,
+    'better-messages-buddynext'
+)->getVcsApi()->enableReleaseAssets( '/^better-messages-buddynext\.zip$/' );
+
+register_deactivation_hook( __FILE__, static function (): void {
+    wp_clear_scheduled_hook( 'bm_buddynext_daily_sync' );
+} );
 
 /**
  * Read an integration option from Better Messages' own settings store, with
