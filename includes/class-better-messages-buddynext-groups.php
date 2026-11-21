@@ -621,7 +621,26 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Groups' ) ) {
             foreach ( $rows as $row ) {
                 $report['threads_checked']++;
 
-                if ( null === $this->get_space( (int) $row->meta_value ) ) {
+                $space_id = (int) $row->meta_value;
+
+                /**
+                 * Straight from the database, NOT through get_space():
+                 * SpaceService caches rows in the persistent object cache,
+                 * and a delete request that died mid-flight leaves the
+                 * removed space cached - exactly the situation this pass
+                 * exists to repair (seen live 2026-11-21: the orphaned
+                 * thread survived the first pass because the erased space
+                 * still answered from Redis). The healer trusts only the
+                 * table, and drops the stale cache entry when they
+                 * disagree.
+                 */
+                $exists = (int) $wpdb->get_var( $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$wpdb->prefix}bn_spaces WHERE id = %d AND is_archived = 0",
+                    $space_id
+                ) );
+
+                if ( 0 === $exists ) {
+                    wp_cache_delete( "space_{$space_id}", 'buddynext_spaces' );
                     Better_Messages()->functions->erase_thread( (int) $row->bm_thread_id );
                     $report['orphans_erased'][] = (int) $row->bm_thread_id;
                 }
