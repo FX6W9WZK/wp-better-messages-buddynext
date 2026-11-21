@@ -25,3 +25,7 @@ msgstr "Du kannst in dieser Unterhaltung keine Nachrichten senden."
 msgctxt "Error when a guest tries to start a conversation"
 msgid "Please sign in to send messages."
 msgstr "Bitte melde dich an, um Nachrichten zu senden."
+
+msgctxt "Navigation entry"
+msgid "Messages"
+msgstr "Nachrichten"
