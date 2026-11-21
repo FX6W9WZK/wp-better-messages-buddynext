@@ -53,6 +53,40 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Skin' ) ) {
             }
 
             add_filter( 'better_messages_css_customizations', array( $this, 'rules' ) );
+            add_action( 'wp_body_open', array( $this, 'mode_sync_script' ), 1 );
+        }
+
+        /**
+         * Keep Better Messages' own dark mode in step with the site's
+         * BuddyX toggle. Parts of the interface carry fixed colors that
+         * only BM's own dark styles restyle (.bm-uname and friends), and
+         * BM decides dark by prefers-color-scheme or its body classes -
+         * never by html[data-bx-mode]. An explicit class always wins over
+         * the media query, so mirroring the attribute onto the body
+         * classes makes BM restyle those parts itself, in step with the
+         * site, while the token rules above lay the house palette on top.
+         *
+         * @return void
+         */
+        public function mode_sync_script()
+        {
+            ?>
+            <script>
+            ( function () {
+                var root = document.documentElement;
+                function sync() {
+                    if ( ! document.body ) {
+                        return;
+                    }
+                    var dark = root.getAttribute( 'data-bx-mode' ) === 'dark';
+                    document.body.classList.toggle( 'bm-messages-dark', dark );
+                    document.body.classList.toggle( 'bm-messages-light', ! dark );
+                }
+                sync();
+                new MutationObserver( sync ).observe( root, { attributes: true, attributeFilter: [ 'data-bx-mode' ] } );
+            } )();
+            </script>
+            <?php
         }
 
         /**
