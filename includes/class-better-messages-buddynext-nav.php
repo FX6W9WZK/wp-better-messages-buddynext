@@ -52,6 +52,59 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Nav' ) ) {
             add_filter( 'buddynext_mobile_nav_items', array( $this, 'mobile_items' ), 10, 2 );
             add_action( 'admin_init', array( $this, 'seed_mobile_editor_row' ) );
             add_action( 'template_redirect', array( $this, 'redirect_legacy_hub' ) );
+
+            /**
+             * The header dropdown builds its rows from the UserLinks
+             * catalogue but then passes them through this filter - and a
+             * theme may return a curated list of its own there (BuddyX
+             * Pro does), which silently drops every catalogue addition.
+             * Late priority, so the Messages row survives whatever list
+             * the theme curates.
+             */
+            add_filter( 'buddynext_header_user_menu_links', array( $this, 'header_menu_links' ), 50, 2 );
+        }
+
+        /**
+         * Ensure the Messages row is part of the header dropdown, after
+         * the connections row when one is there, else appended.
+         *
+         * @param array $links   Quick links ({label,url,icon} rows).
+         * @param int   $user_id Member ID.
+         * @return array
+         */
+        public function header_menu_links( $links, $user_id )
+        {
+            $links = (array) $links;
+            $url   = $this->inbox_url();
+
+            if ( '' === $url ) {
+                return $links;
+            }
+
+            foreach ( $links as $link ) {
+                if ( is_array( $link ) && ( $link['url'] ?? '' ) === $url ) {
+                    return $links;
+                }
+            }
+
+            $row = array(
+                'label' => _x( 'Messages', 'Navigation entry', 'better-messages-buddynext' ),
+                'url'   => $url,
+                'icon'  => 'message-circle',
+            );
+
+            $position = count( $links );
+
+            foreach ( $links as $index => $link ) {
+                if ( is_array( $link ) && false !== strpos( (string) ( $link['url'] ?? '' ), '/connections/' ) ) {
+                    $position = $index + 1;
+                    break;
+                }
+            }
+
+            array_splice( $links, $position, 0, array( $row ) );
+
+            return $links;
         }
 
         /**
