@@ -123,9 +123,18 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Profile' ) ) {
             }
             $icon = ob_get_clean();
 
+            $label = esc_html( _x( 'Message', 'Profile action', 'better-messages-buddynext' ) );
+
             $button = '<a href="' . esc_url( $url ) . '" class="bn-btn bn-pf-actions__wide-only bmbn-profile-message" data-variant="secondary" data-size="sm">'
                 . $icon
-                . '<span>' . esc_html( _x( 'Message', 'Profile action', 'better-messages-buddynext' ) ) . '</span></a>';
+                . '<span>' . $label . '</span></a>';
+
+            // The same action as a row of the "More" overflow menu, which
+            // is where the original button lives below the 641px cut (the
+            // wide-only button is hidden there). Same dress as the menu's
+            // own rows.
+            $menu_item = '<a href="' . esc_url( $url ) . '" class="bn-more-menu-item bmbn-profile-message-row" role="menuitem">'
+                . $icon . $label . '</a>';
 
             ?>
             <script>
@@ -135,6 +144,11 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Profile' ) ) {
                     return;
                 }
                 actions.insertAdjacentHTML( 'beforeend', <?php echo wp_json_encode( $button ); ?> );
+
+                var first = actions.querySelector( '.bn-more-menu-item' );
+                if ( first && ! actions.querySelector( '.bmbn-profile-message-row' ) ) {
+                    first.insertAdjacentHTML( 'beforebegin', <?php echo wp_json_encode( $menu_item ); ?> );
+                }
             } )();
             </script>
             <?php
