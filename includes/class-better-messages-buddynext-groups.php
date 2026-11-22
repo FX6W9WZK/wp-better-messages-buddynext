@@ -173,9 +173,31 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Groups' ) ) {
          *  Group provider
          *  ------------------------------------------------------------ */
 
-        public function is_valid_group( $valid, $group_id )
+        /**
+         * BM calls this with the THREAD id (see get_thread_type()), not
+         * a group id - resolve through the thread meta. Mistaking the
+         * parameter for a space id made the validation a coin flip on
+         * id collisions: thread 5 passed because space 5 happened to
+         * exist, every other space chat was downgraded to a plain
+         * conversation (seen live 2026-11-22).
+         *
+         * @param bool $valid     Whether another integration validated it.
+         * @param int  $thread_id Thread ID.
+         * @return bool
+         */
+        public function is_valid_group( $valid, $thread_id )
         {
-            return null !== $this->get_space( $group_id );
+            if ( $valid ) {
+                return $valid;
+            }
+
+            $space_id = Better_Messages()->functions->get_thread_meta( (int) $thread_id, self::THREAD_META_KEY );
+
+            if ( ! $space_id ) {
+                return $valid;
+            }
+
+            return null !== $this->get_space( (int) $space_id );
         }
 
         public function user_has_groups( $has, $user_id )
@@ -466,6 +488,9 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Groups' ) ) {
         {
             wp_cache_delete( 'thread_recipients_' . $thread_id, 'bp_messages' );
             wp_cache_delete( 'bm_thread_recipients_' . $thread_id, 'bm_messages' );
+            // The validated type is cached (persistently, with an object
+            // cache) - drop it so a fixed validation is picked up.
+            wp_cache_delete( 'thread_' . $thread_id . '_type', 'bm_messages' );
 
             $space_id = Better_Messages()->functions->get_thread_meta( $thread_id, self::THREAD_META_KEY );
             $members  = $this->get_space_members( $space_id );
