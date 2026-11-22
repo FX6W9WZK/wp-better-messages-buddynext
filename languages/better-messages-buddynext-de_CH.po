@@ -33,3 +33,7 @@ msgstr "Nachrichten"
 msgctxt "Navigation entry description"
 msgid "The Better Messages inbox"
 msgstr "Der Better-Messages-Posteingang"
+
+msgctxt "Profile action"
+msgid "Message"
+msgstr "Nachricht"
