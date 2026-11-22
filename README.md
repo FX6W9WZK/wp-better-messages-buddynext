@@ -1,4 +1,4 @@
-# Better Messages for BuddyNext
+# Unofficial Better Messages for BuddyNext
 
 Connects [Better Messages](https://www.better-messages.com/) with the
 [BuddyNext](https://buddynext.com/) community plugin.
