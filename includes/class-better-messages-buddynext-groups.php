@@ -372,6 +372,21 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Groups' ) ) {
                 $thread_id = false;
             }
 
+            /**
+             * Only a real group thread may carry the space link. Seen
+             * live (2026-11-22): a hand-started plain conversation ended
+             * up carrying the meta, so the sync poured the space members
+             * into a two-person thread and the messenger rendered the
+             * space chat as a private dialog. Unhook such a thread - it
+             * stays untouched as the conversation it is - and fall
+             * through to creating the proper group thread.
+             */
+            if ( $thread_id && Better_Messages()->functions->get_thread_type( (int) $thread_id ) !== 'group' ) {
+                Better_Messages()->functions->delete_thread_meta( (int) $thread_id, self::THREAD_META_KEY );
+                Better_Messages()->functions->delete_thread_meta( (int) $thread_id, 'buddynext_space_thread' );
+                $thread_id = false;
+            }
+
             if ( ! $thread_id ) {
                 if ( $this->is_space_messages_enabled( $space_id ) !== 'enabled' ) {
                     return false;
