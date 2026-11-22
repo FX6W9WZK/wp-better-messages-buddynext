@@ -159,7 +159,17 @@ if ( ! class_exists( 'Better_Messages_BuddyNext_Hub' ) ) {
         {
             $want = BM_BUDDYNEXT_VERSION . '|' . self::slug();
 
-            if ( get_option( 'bmbn_hub_rewrites' ) === $want ) {
+            /**
+             * The version|slug stamp alone is not enough: deactivating
+             * any plugin can flush the stored rules while the stamp stays
+             * valid, and on reactivation the guard then blocked the very
+             * repair it exists for (seen live 2026-11-22). So also check
+             * that the stored rules actually CONTAIN our route.
+             */
+            $rules    = get_option( 'rewrite_rules' );
+            $has_rule = is_array( $rules ) && isset( $rules[ '^' . preg_quote( self::slug(), '/' ) . '/?$' ] );
+
+            if ( $has_rule && get_option( 'bmbn_hub_rewrites' ) === $want ) {
                 return;
             }
 
